@@ -1,0 +1,14 @@
+# Ignore heavy sequencing data and Cell Ranger outputs
+**/data/
+**/outs/
+**/SC_RNA_COUNTER_CS/
+**/analysis/
+**/*_feature_bc_matrix/
+**/*.gz
+**/*.bam
+**/*.fastq
+**/*.tif
+**/*.txt*
+# Ignore system files
+*.DS_Store
+Thumbs.db
