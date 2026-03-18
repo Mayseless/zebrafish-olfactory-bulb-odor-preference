@@ -51,11 +51,11 @@ Links activity-defined neurons to transcriptional identity and spatial localizat
 
 The scripts are organized by the experimental modality described in the paper:
 
-* `1\_Single\_cell/`: Seurat-based clustering and cell-type classification.
-* `2\_Spatial\_transcriptomics/`: Spot detection and cellualr assignment, integration with singe cell data (Tangram) and spatial analysis.
-* `3\_Behavior/`: Analysis of flow-based two-choice navigation.
-* `4\_CaMPARI/`: Processing of odor-evoked activity maps.
-* `5\_CaMPARI\_Seq\_\&\_HCR\_Quantification/`: Integration of activity and molecular identity.
+* `1_Single_cell/`: Seurat-based clustering and cell-type classification.
+* `2_Spatial_transcriptomics/`: Spot detection and cellular assignment, integration with singe cell data (Tangram) and spatial analysis.
+* `3_Behavior/`: Analysis of flow-based two-choice navigation.
+* `4_CaMPARI/`: Processing of odor-evoked activity maps.
+* `5_CaMPARI_Seq_&_HCR_Quantification/`: Integration of activity and molecular identity.
 
 
 
