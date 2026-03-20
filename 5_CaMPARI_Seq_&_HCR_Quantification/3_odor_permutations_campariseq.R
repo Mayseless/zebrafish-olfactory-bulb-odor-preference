@@ -157,7 +157,7 @@ obs <- compute_valence_contrast(
 
 observed_contrast <- obs$contrast_df
 
-print(observed_contrast)
+print(observed_contrast, n=100)
 
 # =========================================================
 # 4) Permutation:
@@ -285,14 +285,14 @@ perm_res <- run_valence_permutation_test(
 perm_stats <- perm_res$stats %>%
   mutate(across(where(is.numeric), ~round(., 4)))
 
-print(perm_stats, n = Inf)
+print(perm_stats, n = 100)
 
 # optionally focus on your highlighted clusters
 keep_clusters <- c("7","11","14","19","25","6","18","24")
 perm_stats_subset <- perm_stats %>%
   filter(cluster %in% keep_clusters)
 
-print(perm_stats_subset, n = Inf)
+print(perm_stats_subset, n = Inf, width = Inf)
 
 # =========================================================
 # 7) Plot observed contrast with permutation significance
@@ -325,6 +325,129 @@ p_perm <- ggplot(plot_df, aes(x = cluster, y = observed_contrast)) +
 
 print(p_perm)
 
+# -------------------------------------------------------------------
+# Add sign-based fill variable
+# -------------------------------------------------------------------
+plot_df <- plot_df %>%
+  mutate(fill_sign = ifelse(observed_contrast >= 0, "positive", "negative"))
+
+sign_colors <- c("positive" = "#10eb55", "negative" = "#ff00ff")
+
+# -------------------------------------------------------------------
+# Full plot: all clusters
+# -------------------------------------------------------------------
+p_perm <- ggplot(plot_df, aes(x = cluster, y = observed_contrast, fill = fill_sign)) +
+  geom_col() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_text(aes(y = observed_contrast + 0.08 * sign(observed_contrast + 1e-8),
+                label = sig),
+            size = 3, vjust = ifelse(plot_df$observed_contrast >= 0, 0, 1)) +
+  scale_fill_manual(values = sign_colors, guide = "none") +
+  theme_bw(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  labs(
+    title = "Valence contrast per cluster after odor-label permutation",
+    x     = "Cluster",
+    y     = "Observed contrast: mean positive enrichment - mean negative enrichment"
+  )
+
+print(p_perm)
+
+# -------------------------------------------------------------------
+# Subset plot: selected clusters only
+# -------------------------------------------------------------------
+keep_clusters <- c("7","11","14","19","25","6","18","24")
+
+plot_df_subset <- plot_df %>%
+  filter(as.character(cluster) %in% keep_clusters) %>%
+  mutate(cluster = factor(as.character(cluster), levels = keep_clusters))
+
+p_perm_subset <- ggplot(plot_df_subset, aes(x = cluster, y = observed_contrast, fill = fill_sign)) +
+  geom_col() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_text(aes(y = observed_contrast + 0.08 * sign(observed_contrast + 1e-8),
+                label = sig),
+            size = 3, vjust = ifelse(plot_df_subset$observed_contrast >= 0, 0, 1)) +
+  scale_fill_manual(values = sign_colors, guide = "none") +
+  theme_bw(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  labs(
+    title = "Selected clusters: valence contrast after odor-label permutation",
+    x     = "Cluster",
+    y     = "Observed contrast: mean positive enrichment - mean negative enrichment"
+  )
+
+print(p_perm_subset)
+
+ggsave(
+  filename    = "C:/Oded_data/single_cell_seq/campari_seq/p_perm_subset.pdf",
+  plot        = p_perm_subset,
+  width       = 8,
+  height      = 6,
+  units       = "in",
+  useDingbats = FALSE
+)
+
+library(ggplot2)
+library(dplyr)
+
+keep_clusters <- c("7","11","14","19","25","6","18","24")
+
+# ---------------------------------------------------------------
+# Prepare observed subset (already has fill_sign from before)
+# ---------------------------------------------------------------
+plot_df_subset <- plot_df %>%
+  filter(as.character(cluster) %in% keep_clusters) %>%
+  mutate(cluster = factor(as.character(cluster), levels = keep_clusters))
+
+# ---------------------------------------------------------------
+# Prepare permutation null subset
+# ---------------------------------------------------------------
+perm_subset <- perm_res$permuted %>%
+  filter(as.character(cluster) %in% keep_clusters) %>%
+  mutate(cluster = factor(as.character(cluster), levels = keep_clusters))
+
+sign_colors <- c("positive" = "#10eb55", "negative" = "#ff00ff")
+
+# ===============================================================
+# PLOT 2: Violin + colored bar
+# ===============================================================
+p_perm_violin <- ggplot() +
+  # null distribution violin
+  geom_violin(data = perm_subset,
+              aes(x = cluster, y = contrast),
+              fill = "grey80", color = "grey50",
+              alpha = 0.7, width = 0.8, linewidth = 0.3) +
+  # observed bar on top
+  geom_col(data = plot_df_subset,
+           aes(x = cluster, y = observed_contrast, fill = fill_sign),
+           width = 0.4, alpha = 0.9) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_text(data = plot_df_subset,
+            aes(x = cluster,
+                y = observed_contrast + 0.08 * sign(observed_contrast + 1e-8),
+                label = sig),
+            size = 3,
+            vjust = ifelse(plot_df_subset$observed_contrast >= 0, 0, 1)) +
+  scale_fill_manual(values = sign_colors, guide = "none") +
+  theme_bw(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  labs(
+    title    = "Selected clusters: valence contrast vs. permutation null",
+    subtitle = "Grey violin = null distribution (5000 permutations); bar = observed",
+    x        = "Cluster",
+    y        = "Valence contrast"
+  )
+
+print(p_perm_violin)
+
+ggsave(
+  filename    = "C:/Oded_data/single_cell_seq/campari_seq/p_perm_violin_subset.pdf",
+  plot        = p_perm_violin,
+  width       = 8, height = 6, units = "in",
+  useDingbats = FALSE
+)
+
 # =========================================================
 # 8) Optional null-distribution plot for one cluster
 # =========================================================
@@ -348,39 +471,6 @@ plot_null_for_cluster <- function(cluster_id, perm_res) {
 }
 
 # examples:
-print(plot_null_for_cluster("24", perm_res))
+print(plot_null_for_cluster("18", perm_res))
 print(plot_null_for_cluster("25", perm_res))
-
-
-cluster_of_interest <- "24"
-
-all_cells %>%
-  dplyr::filter(cluster == cluster_of_interest,
-                sample %in% c("TCA", "Cytidine", "ATP", "E3")) %>%
-  dplyr::count(sample, replicate, name = "n_cells") %>%
-  tidyr::complete(sample, replicate, fill = list(n_cells = 0)) %>%
-  dplyr::arrange(sample, replicate)
-
-ob_clusters <- c("6","7","11","14","18","24","25")
-
-all_cells %>%
-  filter(cluster %in% ob_clusters, sample %in% c("TCA", "Cytidine", "ATP", "E3")) %>%
-  dplyr::count(cluster, sample, replicate, name = "n_cells") %>%
-  tidyr::complete(cluster, sample, replicate, fill = list(n_cells = 0)) %>%
-  arrange(as.numeric(cluster), sample, replicate)
-
-
-perm_stats_subset %>%
-  select(cluster, observed_contrast, null_sd, null_q95_abs, p_emp_two_sided, q_emp_two_sided)
-
-cluster_totals <- all_cells %>%
-  filter(cluster %in% c("6","7","11","14","18","24","25"),
-         sample %in% c("TCA", "Cytidine", "ATP", "E3")) %>%
-  dplyr::count(cluster, name = "total_cells")
-
-perm_stats_subset %>%
-  left_join(cluster_totals, by = "cluster") %>%
-  arrange(as.numeric(cluster)) %>%
-  print(n = Inf, width = Inf)
-
-effect_to_noise <- observed_contrast / null_sd
+print(plot_null_for_cluster("24", perm_res))
