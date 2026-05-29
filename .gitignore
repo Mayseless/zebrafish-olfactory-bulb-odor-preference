@@ -24,9 +24,6 @@ Thumbs.db
 2_Spatial_transcriptomics/Processed data/SeqFISH_normalized_gene_count_matrices.zip
 4_CaMPARI/CaMPARI2_odor_maps.zip
 5_CaMPARI_Seq_&_HCR_Quantification/CaMPARI_seq_data/CaMPARI2_seq_FS_16042026.rds
-5_CaMPARI_Seq_&_HCR_Quantification/CaMPARI_seq_data/enrichment_summary.csv
-5_CaMPARI_Seq_&_HCR_Quantification/CaMPARI_seq_data/pairwise_summary.csv
-5_CaMPARI_Seq_&_HCR_Quantification/CaMPARI_seq_data/perm_stats.csv
 4_CaMPARI/KDE_volumes/.imaris_cache/All patterns.ims/info.xml
 4_CaMPARI/KDE_volumes/.imaris_cache/All patterns.ims/meta_0.xml
 4_CaMPARI/KDE_volumes/.imaris_cache/pattern_1_odor_normalized_maxnorm_sigma5.0.ims/info.xml
