@@ -1,4 +1,4 @@
-# Mayseless et al 2026
+# Zebrafish-olfactory-bulb-odor-preference
 
 This repository contains the analysis scripts and workflows for the study:
 
