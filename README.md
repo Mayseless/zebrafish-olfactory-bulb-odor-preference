@@ -44,17 +44,21 @@ Scripts are organized by experimental modality:
 - `5_CaMPARI_Seq_&_HCR_Quantification/`  
   Analysis of CaMPARI2-seq, HCR validation, and links between activity, molecular identity, and spatial localization.
 
-## Notes
-
-This repository accompanies a research manuscript and is intended to support transparency and reproducibility. It is not a fully packaged software tool.
-
-Scripts may require adaptation depending on the local computing environment, file paths, and data organization.
-
 ## Data availability
 
 This repository contains analysis scripts and workflows associated with the manuscript. Large raw imaging, sequencing, and behavioral datasets are not stored directly in this GitHub repository because of file-size constraints.
 
-Processed data required to reproduce the main analyses will be deposited in a public data repository and linked here upon publication. Until then, data access for review can be provided through Zenodo DOI: 10.5281/zenodo.19607911
+Processed data required to reproduce the main analyses will be deposited in a public data repository and linked here upon publication. Until then, data access for review can be provided through the journal review system or upon reasonable request, where applicable.
+
+## Repository status
+
+This repository accompanies a manuscript in pre-publication/review stage. The code is provided for transparency and reproducibility. A permanent archived release and DOI will be added upon publication.
+
+## Notes
+
+This repository is intended to support transparency and reproducibility. It is not a fully packaged software tool.
+
+Scripts may require adaptation depending on the local computing environment, file paths, and data organization.
 
 ## Citation
 
