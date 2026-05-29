@@ -73,5 +73,5 @@ Code may require adaptation depending on local environment and data structure.
 
 If you use these scripts or the data provided, please cite:
 
-> Mayseless, O., Navajas Acedo, J., Wan, Y., Hahaut, V., Picelli, S., Friedrich, R.W., \& Schier, A.F. (2026).Spatial transcriptional modules in the zebrafish olfactory bulb reflect odor preference.
+> Mayseless, O., Navajas Acedo, J., Wan, Y., Hahaut, V., Picelli, S., Friedrich, R.W., \& Schier, A.F. (2026). Odor preference maps to cohesive transcriptional domains in the olfactory bulb.
 
