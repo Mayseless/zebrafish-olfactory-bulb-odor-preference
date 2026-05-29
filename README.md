@@ -3,7 +3,7 @@
 This repository contains the analysis scripts and workflows for the study:
 
 Mayseless et al. (2026)
-**"Spatial transcriptional modules in the zebrafish olfactory bulb reflect odor preference"**
+**"Odor preference maps to cohesive transcriptional domains in the olfactory bulb"**
 
 
 
