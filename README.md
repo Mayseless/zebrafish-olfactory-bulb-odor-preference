@@ -50,7 +50,11 @@ This repository accompanies a research manuscript and is intended to support tra
 
 Scripts may require adaptation depending on the local computing environment, file paths, and data organization.
 
-Data is depositied in Zenodo DOI: 10.5281/zenodo.19607911
+## Data availability
+
+This repository contains analysis scripts and workflows associated with the manuscript. Large raw imaging, sequencing, and behavioral datasets are not stored directly in this GitHub repository because of file-size constraints.
+
+Processed data required to reproduce the main analyses will be deposited in a public data repository and linked here upon publication. Until then, data access for review can be provided through Zenodo DOI: 10.5281/zenodo.19607911
 
 ## Citation
 
