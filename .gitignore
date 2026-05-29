@@ -45,3 +45,5 @@ Thumbs.db
 
 # CaMPARI-seq large processed object
 5_CaMPARI_Seq_&_HCR_Quantification/CaMPARI_seq_data/CaMPARI2_seq_FS_16042026.rds
+5_CaMPARI_Seq_HCR_Quantification/CaMPARI_seq_data/count_gene.txt
+5_CaMPARI_Seq_HCR_Quantification/CaMPARI_seq_data/count_gene.txt.summary
