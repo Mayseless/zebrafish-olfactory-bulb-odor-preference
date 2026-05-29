@@ -29,7 +29,7 @@ library(scales)
 library(tidyr)
 library(seriation)
 library(viridis)
-source("2_Siluohette_scoring.R")
+source("2_Silhouette_scoring.R")
 source("3_RF_cluster_classification.R")
 
 # Set Working Directory and Paths ---------------------------------------------
