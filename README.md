@@ -50,6 +50,8 @@ This repository accompanies a research manuscript and is intended to support tra
 
 Scripts may require adaptation depending on the local computing environment, file paths, and data organization.
 
+Data is depositied in Zenodo DOI: 10.5281/zenodo.19607911
+
 ## Citation
 
 If you use these scripts or associated data, please cite the manuscript once available:
