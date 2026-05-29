@@ -8,37 +8,33 @@
 **/*.bam
 **/*.fastq
 **/*.tif
-**/*.txt*
-# Ignore system files
+
+# Avoid ignoring all text files globally unless necessary
+# **/*.txt*
+
+# System files
 *.DS_Store
 Thumbs.db
-1_Single_cell/10x_scripts/.Rhistory
-/2_Spatial_transcriptomics/Processed data/called_spots
+
+# R local files
+.Rhistory
+.RData
+.Rproj.user/
+
+# Spatial transcriptomics processed data
+/2_Spatial_transcriptomics/Processed data/called_spots/
 2_Spatial_transcriptomics/Processed data/normalized_gene_count_matrix_point0000.csv
 2_Spatial_transcriptomics/Processed data/normalized_gene_count_matrix_point0000.h5ad
 2_Spatial_transcriptomics/Processed data/normalized_gene_count_matrix_point0002.csv
 2_Spatial_transcriptomics/Processed data/normalized_gene_count_matrix_point0002.h5ad
 2_Spatial_transcriptomics/Processed data/Ordered_primary_probes.fasta
 2_Spatial_transcriptomics/Processed data/SeqFISH_called_spots_and_data.zip
-2_Spatial_transcriptomics/Processed data/seqFISH_CP_202405_model
+2_Spatial_transcriptomics/Processed data/seqFISH_CP_202405_model/
 2_Spatial_transcriptomics/Processed data/SeqFISH_normalized_gene_count_matrices.zip
+
+# CaMPARI large volumes and generated media
 4_CaMPARI/CaMPARI2_odor_maps.zip
-5_CaMPARI_Seq_&_HCR_Quantification/CaMPARI_seq_data/CaMPARI2_seq_FS_16042026.rds
-4_CaMPARI/KDE_volumes/.imaris_cache/All patterns.ims/info.xml
-4_CaMPARI/KDE_volumes/.imaris_cache/All patterns.ims/meta_0.xml
-4_CaMPARI/KDE_volumes/.imaris_cache/pattern_1_odor_normalized_maxnorm_sigma5.0.ims/info.xml
-4_CaMPARI/KDE_volumes/.imaris_cache/pattern_1_odor_normalized_maxnorm_sigma5.0.ims/meta_0.xml
-4_CaMPARI/KDE_volumes/.imaris_cache/pattern_2_odor_normalized_maxnorm_sigma5.0.ims/info.xml
-4_CaMPARI/KDE_volumes/.imaris_cache/pattern_2_odor_normalized_maxnorm_sigma5.0.ims/thumb_256_0.jpg
-4_CaMPARI/KDE_volumes/.imaris_cache/pattern_3_odor_normalized_maxnorm_sigma5.0.ims/info.xml
-4_CaMPARI/KDE_volumes/.imaris_cache/pattern_3_odor_normalized_maxnorm_sigma5.0.ims/meta_0.xml
-4_CaMPARI/KDE_volumes/.imaris_cache/pattern_3_odor_normalized_maxnorm_sigma5.0.ims/thumb_256_0.jpg
-4_CaMPARI/KDE_volumes/.imaris_cache/pattern_5_odor_normalized_maxnorm_sigma5.0.ims/info.xml
-4_CaMPARI/KDE_volumes/.imaris_cache/pattern_5_odor_normalized_maxnorm_sigma5.0.ims/meta_0.xml
-4_CaMPARI/KDE_volumes/.imaris_cache/pattern_5_odor_normalized_maxnorm_sigma5.0.ims/thumb_256_0.jpg
-4_CaMPARI/KDE_volumes/.imaris_cache/pattern_6_odor_normalized_maxnorm_sigma5.0.ims/info.xml
-4_CaMPARI/KDE_volumes/.imaris_cache/pattern_6_odor_normalized_maxnorm_sigma5.0.ims/meta_0.xml
-4_CaMPARI/KDE_volumes/.imaris_cache/pattern_6_odor_normalized_maxnorm_sigma5.0.ims/thumb_256_0.jpg
+4_CaMPARI/KDE_volumes/.imaris_cache/
 4_CaMPARI/KDE_volumes/All patterns.ims
 *.mp4
 *.png
@@ -46,3 +42,6 @@ Thumbs.db
 *.pdf
 *.ims
 *.nrrd
+
+# CaMPARI-seq large processed object
+5_CaMPARI_Seq_&_HCR_Quantification/CaMPARI_seq_data/CaMPARI2_seq_FS_16042026.rds
