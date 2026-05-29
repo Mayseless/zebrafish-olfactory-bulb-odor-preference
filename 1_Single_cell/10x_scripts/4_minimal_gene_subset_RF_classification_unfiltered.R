@@ -9,9 +9,6 @@
 # - Accuracy vs. number of genes analysis
 # - Minimal gene set identification
 #
-# Author: [Your Name]
-# Date: [Current Date]
-# Dependencies: Requires output from scRNA_seq_analysis_publication.R
 ################################################################################
 
 # Load Required Libraries ------------------------------------------------------
@@ -27,8 +24,8 @@ suppressPackageStartupMessages({
 })
 
 # Set Paths and Parameters -----------------------------------------------------
-output_dir <- "U:/Scientific Data/RG-AS04-Data01/Oded_Mayseless/innate_behavior/figures/"
-data_dir <- "C:/Oded_data/single_cell_seq/data/20241101"
+output_dir <- "Path_to_output_dir"
+data_dir <- "Path_to_data_dir"
 
 # Analysis parameters
 set.seed(123)  # For reproducibility
@@ -53,7 +50,7 @@ if (!dir.exists(output_dir)) {
 # OM_cldn_5dpf_scSEQ_20211209 <- readRDS(file.path(data_dir, "20241101_OM_cldn_5dpf_scSEQ_20211209.rds"))
 
 # Load transcription factor list (optional - for TF-based analysis)
-# All_ZF_TF <- read.csv('C:/Oded_data/single_cell_seq/data/zf_tfs_with_motifs.csv', header = TRUE)
+# All_ZF_TF <- read.csv('Path_toTF_data', header = TRUE)
 
 # Extract Barcodes -------------------------------------------------------------
 filtered_barcodes <- Cells(PN_subset)
@@ -423,7 +420,3 @@ cat("- Overall accuracy:", round(accuracy * 100, 2), "%\n")
 cat("- PN cluster accuracy:", round(pn_accuracy * 100, 2), "%\n")
 cat("- Minimal genes required:", minimal_genes, "\n")
 cat("- Max accuracy achieved:", round(max_accuracy * 100, 2), "%\n")
-
-# Session Information ----------------------------------------------------------
-cat("\nSession Information:\n")
-sessionInfo()

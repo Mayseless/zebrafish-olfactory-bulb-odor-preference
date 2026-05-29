@@ -128,9 +128,9 @@ RF_cluster_classification <- function(seurat_obj, gene_list, gene_list_name, out
               misclass_heatmap = misclass_heatmap, accuracy_plot = accuracy_plot,importance_plot = importance_plot))
 }
 
-# save_dir = "U:/Scientific Data/RG-AS04-Data01/Oded_Mayseless/innate_behavior/supplamental_tables_data_scripts_01_2026/10x_scRNA_seq"
+# save_dir = "Path_to_output_dir"
 # 
 # TF_reults <- RF_cluster_classification(PN_subset, All_ZF_TF$gene_symbol, "Transcription Factors", output_dir = save_dir)
-# #ribo_genes<-read.csv2('C:/Oded_data/single_cell_seq/data/dre03011_extracted_gene_names.csv')
+# #ribo_genes<-read.csv2('Path_to_ribo_genes')
 # ribo_results<-RF_cluster_classification(PN_subset, ribo_genes$Gene_Name, "Ribosomal genes", output_dir = save_dir)
 # 

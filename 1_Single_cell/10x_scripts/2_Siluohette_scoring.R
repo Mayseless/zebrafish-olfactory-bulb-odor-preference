@@ -137,6 +137,6 @@ ChooseClusterResolutionDownsample <- function(
 }
 
 
-# dir = "U:/Scientific Data/RG-AS04-Data01/Oded_Mayseless/innate_behavior/supplamental_tables_data_scripts_01_2026/10x_scRNA_seq"
+# dir = "Path_to_output_dir"
 # 
 # scData.combined <- ChooseClusterResolutionDownsample(PN_subset, 30,figdir = dir)

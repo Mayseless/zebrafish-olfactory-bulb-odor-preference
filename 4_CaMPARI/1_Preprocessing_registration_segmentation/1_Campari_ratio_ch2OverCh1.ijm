@@ -2,7 +2,7 @@
 //path = getDirectory("Choose a directory");
 //setBatchMode(true);
 
-path = "U:/Scientific Data/RG-AS04-Data01/Oded_Mayseless/imaging_data/spinSR/20250120_CaMPARI_rpp25b/";
+path = "Path_to_images";
 
 
 processFolder(path);

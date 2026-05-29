@@ -33,8 +33,8 @@ source("2_Siluohette_scoring.R")
 source("3_RF_cluster_classification.R")
 
 # Set Working Directory and Paths ---------------------------------------------
-save_dir <- "U:/Scientific Data/RG-AS04-Data01/Oded_Mayseless/innate_behavior/figures/20241115_single_cell/20250509"
-data_dir <- "U:/Scientific Data/RG-AS04-Data01/Oded_Mayseless/sequencing_data/OM_cldn_5dpf_scSEQ_20211209/cell_ranger_processed/outs/filtered_feature_bc_matrix"
+save_dir <- "Path_to_output_dir"
+data_dir <- "Path_to_data_dir"
 
 # Create output directory if it doesn't exist
 if (!dir.exists(save_dir)) {
@@ -559,9 +559,9 @@ PN_ex_in_dotPlot <- DotPlot(
 # SECTION 8: RF VALIDATAION of OLFACTORY BULB CLUSTERING
 ################################################################################
 
-# All_ZF_TF <-read.csv('C:/Oded_data/single_cell_seq/data/zf_tfs_with_motifs.csv', header = TRUE)
+All_ZF_TF <-read.csv('Path_to_TF_data', header = TRUE)
 TF_reults <- RF_cluster_classification(PN_subset, All_ZF_TF$gene_symbol, "Transcription Factors", output_dir = save_dir)
-ribo_genes<-read.csv2('C:/Oded_data/single_cell_seq/data/dre03011_extracted_gene_names.csv')
+ribo_genes<-read.csv2('Path_to_ribo_data')
 ribo_results<-RF_cluster_classification(PN_subset, ribo_genes$Gene_Name, "Ribosomal genes", output_dir = save_dir)
 
 

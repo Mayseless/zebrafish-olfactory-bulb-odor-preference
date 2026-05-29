@@ -9,7 +9,7 @@ Script to:
 5) Perform additional analyses (odor consistency, chemical class testing,
    within-odor correlations, and more).
 """
-
+#%%
 import os
 import re
 import numpy as np
@@ -990,3 +990,886 @@ out_csv = os.path.join(output_folder, f"ClusterAssignments_FULL_{method}_th{thre
 cluster_table.to_csv(out_csv, index=False)
 
 print(f"Full cluster assignment table exported → {out_csv}")
+
+#%%
+# %% [markdown]
+# # Odorant-normalized CaMPARI pattern KDEs and scatter plots
+#
+# Run this AFTER the clustering script has completed.
+#
+# Assumes these variables already exist:
+# - matrix
+# - cluster_labels
+# - row_info
+# - assignments
+# - output_folder
+# - STORE_FILENAME
+# - FILTER_SETTINGS
+# - BW
+# - method
+# - thresh_mult
+# %%
+import os
+import re
+from pathlib import Path
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter
+
+try:
+    import SimpleITK as sitk
+except ImportError as e:
+    raise ImportError("SimpleITK is required for reading/writing NRRD/TIFF volumes.") from e
+
+
+# =============================================================================
+# USER PATHS
+# =============================================================================
+
+# Folder containing the transformed per-larva CSV files used for the CaMPARI analysis.
+# EDIT if needed.
+CSV_DIR = (
+    r"C:\Oded_data\campari_pipeline\gitlab"
+      r"\manualDownload\202501_transformed_csv_files"
+)
+
+OB_MASK_PATH = r"C:\Oded_data\campari_pipeline\gitlab\manualDownload\campari-data-analysis-master\Pattern_viz_odor_norm\modified_olfactory_bulb_mask_dilated.tif"
+
+# Output folder for balanced KDEs and scatter plots.
+PATTERN_OUTPUT_DIR = os.path.join(
+    output_folder,
+    f"odorant_normalized_pattern_KDEs_{method}_th{thresh_mult}"
+)
+os.makedirs(PATTERN_OUTPUT_DIR, exist_ok=True)
+
+KDE_OUTPUT_DIR = os.path.join(PATTERN_OUTPUT_DIR, "KDE_volumes")
+SCATTER_OUTPUT_DIR = os.path.join(PATTERN_OUTPUT_DIR, "scatter_plots")
+PANEL_OUTPUT_DIR = os.path.join(PATTERN_OUTPUT_DIR, "projection_panels")
+
+os.makedirs(KDE_OUTPUT_DIR, exist_ok=True)
+os.makedirs(SCATTER_OUTPUT_DIR, exist_ok=True)
+os.makedirs(PANEL_OUTPUT_DIR, exist_ok=True)
+
+
+# =============================================================================
+# FILTERING SETTINGS
+# =============================================================================
+
+# These match your current CaMPARI filtering logic.
+VOL_MIN = 100
+VOL_MAX = 1000
+DISTANCE_THRESHOLD = 10
+INTENSITY_COL = "mean_intensity_channel_2"
+INTENSITY_QUANTILE = 0.90
+UPPER_INTENSITY_QUANTILE = 0.99
+
+DISTANCE_COLUMNS = ["mdG2", "maG", "mdG6", "dG", "vmG", "lG", "dlG", "vpG"]
+
+# KDE settings
+KDE_SIGMA = BW if "BW" in globals() else 5.0
+WEIGHT_BY_INTENSITY = False  # keep False to match your previous KDE extraction logic
+
+# Scatter display settings
+MAX_POINTS_PER_ODOR = 600
+SCATTER_SIZE = 8
+SCATTER_ALPHA = 0.75
+RANDOM_SEED = 1
+
+# Exclude singleton trial clusters from displayed pattern KDEs?
+EXCLUDE_SINGLETON_CLUSTERS = True
+
+# %%
+required_vars = [
+    "matrix",
+    "cluster_labels",
+    "row_info",
+    "assignments",
+    "output_folder",
+    "STORE_FILENAME",
+    "FILTER_SETTINGS",
+]
+
+missing = [v for v in required_vars if v not in globals()]
+if missing:
+    raise NameError(
+        "Missing required variables from the clustering script: "
+        + ", ".join(missing)
+        + "\nRun the clustering script first, then run these cells."
+    )
+
+print("[OK] Required clustering variables are present.")
+print(f"matrix shape: {matrix.shape}")
+print(f"number of cluster labels: {len(cluster_labels)}")
+print(f"output folder: {PATTERN_OUTPUT_DIR}")
+
+#%%
+# %%
+def build_idx_to_csv_map(store_path, fsn):
+    """
+    Read the HDF5 analysis store and map:
+        odor + ds_idx -> csv_filename
+    """
+    rows = []
+
+    with pd.HDFStore(store_path, mode="r") as store:
+        node = store.get_node(f"/{fsn}")
+        st_names = [child._v_name for child in node if child._v_name.startswith("st_")]
+
+        for st_name in st_names:
+            odor = st_name[3:]
+            fn_df = store.get(f"/{fsn}/{st_name}/filenames").copy()
+
+            if "idx" in fn_df.columns and "ds_idx" not in fn_df.columns:
+                fn_df = fn_df.rename(columns={"idx": "ds_idx"})
+
+            if "csv_filename" not in fn_df.columns:
+                raise ValueError(
+                    f"Expected csv_filename column in /{fsn}/{st_name}/filenames. "
+                    f"Found: {fn_df.columns.tolist()}"
+                )
+
+            fn_df["odor"] = odor
+            rows.append(fn_df[["odor", "ds_idx", "csv_filename"]])
+
+    return pd.concat(rows, ignore_index=True)
+
+
+def parse_matrix_index(index_string):
+    """
+    Parse original matrix index strings.
+    Expected format in your scripts:
+        idx, odor, ds_#
+    """
+    parts = str(index_string).split(",")
+    if len(parts) < 3:
+        raise ValueError(f"Could not parse matrix index: {index_string}")
+
+    row_idx = int(parts[0].strip())
+    odor = parts[1].strip()
+    ds = parts[2].strip()
+    ds_idx = int(re.search(r"(\d+)", ds).group(1))
+
+    return row_idx, odor, ds, ds_idx
+
+
+# Parse current matrix rows
+parsed_rows = [parse_matrix_index(x) for x in matrix.index]
+
+members = pd.DataFrame(
+    parsed_rows,
+    columns=["matrix_idx", "odor", "ds", "ds_idx"]
+)
+
+members["cluster"] = cluster_labels
+
+# Add preference and chemical class if functions exist from your clustering script
+if "get_preference_score" in globals() and "preference_scores" in globals():
+    members["pref_score"] = members["odor"].apply(lambda x: get_preference_score(x, preference_scores))
+else:
+    members["pref_score"] = np.nan
+
+if "get_chemical_class" in globals():
+    members["chemical_class"] = members["odor"].apply(get_chemical_class)
+else:
+    members["chemical_class"] = "unknown"
+
+# Merge to original CSV filenames
+idx_to_csv = build_idx_to_csv_map(STORE_FILENAME, FILTER_SETTINGS)
+members = members.merge(idx_to_csv, on=["odor", "ds_idx"], how="left")
+
+members["csv_path"] = members["csv_filename"].apply(
+    lambda x: os.path.join(CSV_DIR, x) if pd.notna(x) else np.nan
+)
+
+# Drop missing paths
+missing_csv = members[members["csv_filename"].isna()]
+if len(missing_csv) > 0:
+    print("[WARNING] Rows without csv_filename mapping:")
+    display(missing_csv[["odor", "ds", "ds_idx", "cluster"]].head(20))
+
+exists = members["csv_path"].apply(lambda p: os.path.exists(p) if pd.notna(p) else False)
+if (~exists).any():
+    print("[WARNING] Some CSV paths do not exist and will be dropped:")
+    display(members.loc[~exists, ["odor", "ds", "cluster", "csv_path"]].head(20))
+
+members = members.loc[exists].copy()
+
+# Optionally remove singleton clusters by trial count
+trial_counts = members["cluster"].value_counts().sort_index()
+singleton_clusters = trial_counts[trial_counts < 2].index.tolist()
+
+if EXCLUDE_SINGLETON_CLUSTERS:
+    members = members[~members["cluster"].isin(singleton_clusters)].copy()
+
+print("[MEMBERS SUMMARY]")
+display(
+    members.groupby("cluster")
+    .agg(
+        n_trials=("odor", "size"),
+        n_odor_conditions=("odor", "nunique"),
+        odors=("odor", lambda x: "; ".join(sorted(x.unique())))
+    )
+    .reset_index()
+)
+
+members.to_csv(
+    os.path.join(PATTERN_OUTPUT_DIR, "pattern_members_with_csv_paths.csv"),
+    index=False
+)
+
+#%%
+# %%
+def load_sitk_volume(path, dtype=np.float32):
+    img = sitk.ReadImage(path)
+    arr = sitk.GetArrayFromImage(img).astype(dtype)
+    return arr, img
+
+
+def save_sitk_volume(vol_zyx, out_path, reference_img=None):
+    img = sitk.GetImageFromArray(vol_zyx.astype(np.float32))
+    if reference_img is not None:
+        img.CopyInformation(reference_img)
+    sitk.WriteImage(img, out_path)
+
+
+ob_mask, ref_img = load_sitk_volume(OB_MASK_PATH, dtype=bool)
+vol_shape = ob_mask.shape
+print(f"OB mask shape, z/y/x: {vol_shape}")
+
+
+def detect_coordinate_columns(df):
+    """
+    Support either x/y/z or centroid_x/centroid_y/centroid_z naming.
+    """
+    if {"x", "y", "z"}.issubset(df.columns):
+        return "x", "y", "z"
+    if {"centroid_x", "centroid_y", "centroid_z"}.issubset(df.columns):
+        return "centroid_x", "centroid_y", "centroid_z"
+
+    raise ValueError(
+        "No coordinate columns found. Expected either x,y,z or centroid_x,centroid_y,centroid_z."
+    )
+
+
+def load_filtered_points_from_csv(csv_path, vol_shape):
+    """
+    Load one larva CSV and return filtered active-cell coordinates.
+    Returns:
+        coords_zyx, intensity
+    """
+    df = pd.read_csv(csv_path)
+
+    required = {"volume", INTENSITY_COL}
+    missing = required.difference(df.columns)
+    if missing:
+        raise ValueError(f"Missing required columns in {csv_path}: {missing}")
+
+    x_col, y_col, z_col = detect_coordinate_columns(df)
+
+    # Cell volume filtering
+    df = df[(df["volume"] >= VOL_MIN) & (df["volume"] < VOL_MAX)].copy()
+
+    # Distance-to-glomerulus filtering, if all distance columns exist
+    available_dist_cols = [c for c in DISTANCE_COLUMNS if c in df.columns]
+    if len(available_dist_cols) > 0:
+        df = df[df[available_dist_cols].min(axis=1) <= DISTANCE_THRESHOLD].copy()
+    else:
+        print(f"[WARNING] No distance columns found in {csv_path}; skipping distance filter.")
+
+    if len(df) == 0:
+        return np.empty((0, 3), dtype=int), np.empty((0,), dtype=float)
+
+    # Top 10% activity, with optional upper clipping at 99th percentile
+    lo = df[INTENSITY_COL].quantile(INTENSITY_QUANTILE)
+    hi = df[INTENSITY_COL].quantile(UPPER_INTENSITY_QUANTILE)
+
+    df = df[(df[INTENSITY_COL] >= lo) & (df[INTENSITY_COL] <= hi)].copy()
+
+    if len(df) == 0:
+        return np.empty((0, 3), dtype=int), np.empty((0,), dtype=float)
+
+    x = df[x_col].round().astype(int).to_numpy()
+    y = df[y_col].round().astype(int).to_numpy()
+    z = df[z_col].round().astype(int).to_numpy()
+    intensity = df[INTENSITY_COL].astype(float).to_numpy()
+
+    valid = (
+        (z >= 0) & (z < vol_shape[0]) &
+        (y >= 0) & (y < vol_shape[1]) &
+        (x >= 0) & (x < vol_shape[2])
+    )
+
+    coords_zyx = np.column_stack([z[valid], y[valid], x[valid]])
+    intensity = intensity[valid]
+
+    return coords_zyx.astype(int), intensity.astype(float)
+
+
+def points_to_sum_normalized_kde(
+    coords_zyx,
+    intensity,
+    vol_shape,
+    sigma=5.0,
+    ob_mask=None,
+    weight_by_intensity=False,
+):
+    """
+    Convert one larva's points into a sum-normalized KDE.
+    This makes each larva contribute equally before odor-level averaging.
+    """
+    vol = np.zeros(vol_shape, dtype=np.float32)
+
+    if len(coords_zyx) == 0:
+        return vol
+
+    z = coords_zyx[:, 0]
+    y = coords_zyx[:, 1]
+    x = coords_zyx[:, 2]
+
+    if weight_by_intensity:
+        weights = np.maximum(intensity.astype(np.float32), 0)
+    else:
+        weights = np.ones(len(coords_zyx), dtype=np.float32)
+
+    np.add.at(vol, (z, y, x), weights)
+
+    if ob_mask is not None:
+        vol *= ob_mask
+
+    s = vol.sum()
+    if s > 0:
+        vol /= s
+
+    kde = gaussian_filter(vol, sigma=sigma)
+
+    if ob_mask is not None:
+        kde *= ob_mask
+
+    s = kde.sum()
+    if s > 0:
+        kde /= s
+
+    return kde.astype(np.float32)
+
+
+def max_normalize(vol):
+    m = float(np.nanmax(vol))
+    if m > 0:
+        return vol / m
+    return vol
+
+
+# %%
+pattern_summary_rows = []
+odor_contribution_rows = []
+pattern_kdes = {}
+
+for cluster_id, cluster_df in members.groupby("cluster"):
+    cluster_id = int(cluster_id)
+    print(f"\n[Pattern {cluster_id}]")
+
+    odor_kdes = []
+    odor_names = []
+
+    for odor, odor_df in cluster_df.groupby("odor"):
+        trial_kdes = []
+        n_points_total = 0
+        n_trials_used = 0
+
+        for _, row in odor_df.iterrows():
+            coords, intensity = load_filtered_points_from_csv(row["csv_path"], vol_shape)
+            n_points_total += len(coords)
+
+            if len(coords) == 0:
+                continue
+
+            trial_kde = points_to_sum_normalized_kde(
+                coords_zyx=coords,
+                intensity=intensity,
+                vol_shape=vol_shape,
+                sigma=KDE_SIGMA,
+                ob_mask=ob_mask,
+                weight_by_intensity=WEIGHT_BY_INTENSITY,
+            )
+
+            if trial_kde.sum() > 0:
+                trial_kdes.append(trial_kde)
+                n_trials_used += 1
+
+        if len(trial_kdes) == 0:
+            print(f"  [WARNING] {odor}: no valid trial KDEs")
+            continue
+
+        # Average larvae within this odor condition
+        odor_kde = np.mean(np.stack(trial_kdes, axis=0), axis=0)
+
+        # Sum-normalize each odor condition before cluster averaging
+        if odor_kde.sum() > 0:
+            odor_kde = odor_kde / odor_kde.sum()
+
+        odor_kdes.append(odor_kde.astype(np.float32))
+        odor_names.append(odor)
+
+        odor_contribution_rows.append({
+            "cluster": cluster_id,
+            "odor": odor,
+            "n_trials_in_cluster": len(odor_df),
+            "n_trials_used_for_kde": n_trials_used,
+            "n_points_after_filtering_total": n_points_total,
+            "pref_score": odor_df["pref_score"].iloc[0] if "pref_score" in odor_df.columns else np.nan,
+            "chemical_class": odor_df["chemical_class"].iloc[0] if "chemical_class" in odor_df.columns else np.nan,
+        })
+
+        print(
+            f"  {odor}: {n_trials_used}/{len(odor_df)} trials used, "
+            f"{n_points_total} active points"
+        )
+
+    if len(odor_kdes) == 0:
+        print(f"  [WARNING] Pattern {cluster_id}: no valid odor KDEs")
+        continue
+
+    # Average odor-condition KDEs within the pattern
+    pattern_kde_sum = np.mean(np.stack(odor_kdes, axis=0), axis=0)
+
+    if pattern_kde_sum.sum() > 0:
+        pattern_kde_sum = pattern_kde_sum / pattern_kde_sum.sum()
+
+    pattern_kde_max = max_normalize(pattern_kde_sum)
+
+    pattern_kdes[cluster_id] = pattern_kde_max
+
+    out_sum = os.path.join(
+        KDE_OUTPUT_DIR,
+        f"pattern_{cluster_id}_ODOR_NORMALIZED_sumNorm_sigma{KDE_SIGMA}.nrrd"
+    )
+    out_max = os.path.join(
+        KDE_OUTPUT_DIR,
+        f"pattern_{cluster_id}_ODOR_NORMALIZED_maxNorm_sigma{KDE_SIGMA}.nrrd"
+    )
+
+    save_sitk_volume(pattern_kde_sum, out_sum, reference_img=ref_img)
+    save_sitk_volume(pattern_kde_max, out_max, reference_img=ref_img)
+
+    pattern_summary_rows.append({
+        "cluster": cluster_id,
+        "n_trials": len(cluster_df),
+        "n_odor_conditions": len(odor_names),
+        "odor_conditions": "; ".join(sorted(odor_names)),
+        "kde_sumNorm_path": out_sum,
+        "kde_maxNorm_path": out_max,
+    })
+
+pattern_summary = pd.DataFrame(pattern_summary_rows)
+odor_contributions = pd.DataFrame(odor_contribution_rows)
+
+pattern_summary.to_csv(
+    os.path.join(PATTERN_OUTPUT_DIR, "odor_normalized_pattern_KDE_summary.csv"),
+    index=False
+)
+odor_contributions.to_csv(
+    os.path.join(PATTERN_OUTPUT_DIR, "odor_contributions_to_patterns.csv"),
+    index=False
+)
+
+display(pattern_summary)
+display(odor_contributions)
+
+# %%
+
+# %%
+# =============================================================================
+# CLEAN SCATTER PLOTS — single self-contained cell
+#
+# Assumes the following are already in memory from the clustering script
+# (everything up to and including the "#executed fine" cell):
+#   pattern_kdes, pattern_summary, members, vol_shape, ob_mask, ref_img,
+#   cluster_ids, output_folder, STORE_FILENAME, FILTER_SETTINGS, BW,
+#   method, thresh_mult,
+#   PATTERN_OUTPUT_DIR, KDE_OUTPUT_DIR, SCATTER_OUTPUT_DIR, PANEL_OUTPUT_DIR,
+#   VOL_MIN, VOL_MAX, DISTANCE_THRESHOLD, DISTANCE_COLUMNS,
+#   INTENSITY_COL, INTENSITY_QUANTILE, UPPER_INTENSITY_QUANTILE,
+#   KDE_SIGMA, WEIGHT_BY_INTENSITY, RANDOM_SEED
+#   (all loaded by the cells between USER PATHS and "#executed fine")
+# =============================================================================
+
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
+
+os.makedirs(SCATTER_OUTPUT_DIR, exist_ok=True)
+
+# -----------------------------------------------------------------------
+# SETTINGS
+# -----------------------------------------------------------------------
+
+# Reference cloud
+REFERENCE_N_TOTAL          = 10_000
+REFERENCE_Q_LOW            = 0.10
+REFERENCE_Q_HIGH           = 0.50
+REFERENCE_MIN_INTENSITY    = 0
+REFERENCE_MAX_PER_FILE     = 5_000
+REFERENCE_SIZE             = 12
+REFERENCE_ALPHA            = 0.8
+REFERENCE_CMAP             = "plasma"
+REFERENCE_VMIN             = 0
+REFERENCE_VMAX             = 4_000
+
+# KDE color scale (computed below from all patterns)
+PATTERN_CMAP               = "plasma"
+
+# Alpha mapping knobs
+alpha_at_0_Var   = 0.4
+alpha_at_05_Var  = 0.65
+alpha_at_1_Var   = 0.9
+
+# 3-D view
+VIEW_ELEV = 20
+VIEW_AZIM = -65
+
+# -----------------------------------------------------------------------
+# HELPER FUNCTIONS
+# -----------------------------------------------------------------------
+
+def detect_coordinate_columns(df):
+    if {"x", "y", "z"}.issubset(df.columns):
+        return "x", "y", "z"
+    if {"centroid_x", "centroid_y", "centroid_z"}.issubset(df.columns):
+        return "centroid_x", "centroid_y", "centroid_z"
+    raise ValueError(
+        "No coordinate columns found. "
+        "Expected either x,y,z or centroid_x,centroid_y,centroid_z."
+    )
+
+
+def load_scatter_points_from_raw_csv(
+    csv_path,
+    vol_shape,
+    q_low=0.10,
+    q_high=0.99,
+    min_intensity=0,
+    apply_volume_filter=True,
+    apply_distance_filter=True,
+):
+    """Load raw CSV and return scatter-ready (coords_zyx, intensity)."""
+    df = pd.read_csv(csv_path)
+
+    required = {"volume", INTENSITY_COL}
+    missing = required.difference(df.columns)
+    if missing:
+        raise ValueError(f"Missing required columns in {csv_path}: {missing}")
+
+    x_col, y_col, z_col = detect_coordinate_columns(df)
+
+    if apply_volume_filter:
+        df = df[(df["volume"] >= VOL_MIN) & (df["volume"] < VOL_MAX)].copy()
+
+    if apply_distance_filter:
+        avail = [c for c in DISTANCE_COLUMNS if c in df.columns]
+        if avail:
+            df = df[df[avail].min(axis=1) <= DISTANCE_THRESHOLD].copy()
+        else:
+            print(f"[WARNING] No distance columns in {csv_path}; skipping distance filter.")
+
+    if len(df) == 0:
+        return np.empty((0, 3), dtype=int), np.empty((0,), dtype=float)
+
+    lo = df[INTENSITY_COL].quantile(q_low)
+    hi = df[INTENSITY_COL].quantile(q_high)
+    lower_thr = max(lo, min_intensity)
+    df = df[(df[INTENSITY_COL] >= lower_thr) & (df[INTENSITY_COL] <= hi)].copy()
+
+    if len(df) == 0:
+        return np.empty((0, 3), dtype=int), np.empty((0,), dtype=float)
+
+    x = df[x_col].round().astype(int).to_numpy()
+    y = df[y_col].round().astype(int).to_numpy()
+    z = df[z_col].round().astype(int).to_numpy()
+    intensity = df[INTENSITY_COL].astype(float).to_numpy()
+
+    valid = (
+        (z >= 0) & (z < vol_shape[0]) &
+        (y >= 0) & (y < vol_shape[1]) &
+        (x >= 0) & (x < vol_shape[2])
+    )
+    coords_zyx = np.column_stack([z[valid], y[valid], x[valid]])
+    return coords_zyx.astype(int), intensity[valid].astype(float)
+
+
+def collect_shared_reference_activity_points(
+    members_df,
+    vol_shape,
+    total_points=10_000,
+    q_low=0.10,
+    q_high=0.99,
+    min_intensity=0,
+    max_points_per_file=5_000,
+    seed=1,
+):
+    """Build one shared full-range activity/anatomy reference cloud from all CSVs."""
+    rng = np.random.default_rng(seed)
+    chunks = []
+
+    unique_files = (
+        members_df[["csv_path", "odor", "cluster"]]
+        .drop_duplicates(subset="csv_path")
+        .reset_index(drop=True)
+    )
+
+    for _, row in unique_files.iterrows():
+        try:
+            coords, intensity = load_scatter_points_from_raw_csv(
+                csv_path=row["csv_path"],
+                vol_shape=vol_shape,
+                q_low=q_low,
+                q_high=q_high,
+                min_intensity=min_intensity,
+            )
+        except Exception as e:
+            print(f"[WARNING] Could not process {row['csv_path']}: {e}")
+            continue
+
+        if len(coords) == 0:
+            continue
+
+        if len(coords) > max_points_per_file:
+            keep = rng.choice(len(coords), size=max_points_per_file, replace=False)
+            coords, intensity = coords[keep], intensity[keep]
+
+        chunks.append(pd.DataFrame({
+            "x": coords[:, 2], "y": coords[:, 1], "z": coords[:, 0],
+            "intensity": intensity,
+            "csv_path": row["csv_path"],
+            "odor": row["odor"],
+            "cluster": row["cluster"],
+        }))
+
+    if not chunks:
+        return pd.DataFrame(columns=["x", "y", "z", "intensity", "csv_path", "odor", "cluster"])
+
+    ref = pd.concat(chunks, ignore_index=True)
+    if len(ref) > total_points:
+        keep = rng.choice(ref.index.to_numpy(), size=total_points, replace=False)
+        ref = ref.loc[keep].copy()
+    return ref.reset_index(drop=True)
+
+
+def add_pattern_kde_score_to_reference(reference_points, pattern_kde, score_col="pattern_kde_score"):
+    """Assign each reference-cloud point the KDE value at its (z,y,x) coordinate."""
+    scored = reference_points.copy()
+    z = scored["z"].round().astype(int).to_numpy()
+    y = scored["y"].round().astype(int).to_numpy()
+    x = scored["x"].round().astype(int).to_numpy()
+    valid = (
+        (z >= 0) & (z < pattern_kde.shape[0]) &
+        (y >= 0) & (y < pattern_kde.shape[1]) &
+        (x >= 0) & (x < pattern_kde.shape[2])
+    )
+    scores = np.zeros(len(scored), dtype=float)
+    scores[valid] = pattern_kde[z[valid], y[valid], x[valid]]
+    scored[score_col] = scores
+    return scored
+
+
+def infer_axis_limits(points_df, vol_shape, pad=12):
+    zmax, ymax, xmax = vol_shape
+    if len(points_df) == 0:
+        return [0, xmax], [0, ymax], [0, zmax]
+    xlim = [max(0, points_df["x"].min() - pad), min(xmax, points_df["x"].max() + pad)]
+    ylim = [max(0, points_df["y"].min() - pad), min(ymax, points_df["y"].max() + pad)]
+    zlim = [max(0, points_df["z"].min() - pad), min(zmax, points_df["z"].max() + pad)]
+    return xlim, ylim, zlim
+
+
+def add_projection_contours(ax, vol_zyx, xlim, ylim, zlim, levels=7, cmap="inferno"):
+    """Add KDE projection contours to floor and side walls of a 3-D scatter plot."""
+    z_size, y_size, x_size = vol_zyx.shape
+    x = np.arange(x_size)
+    y = np.arange(y_size)
+    z = np.arange(z_size)
+
+    xy_proj = vol_zyx.sum(axis=0)   # y, x
+    xz_proj = vol_zyx.sum(axis=1)   # z, x
+    yz_proj = vol_zyx.sum(axis=2)   # z, y
+
+    X_xy, Y_xy = np.meshgrid(x, y)
+    X_xz, Z_xz = np.meshgrid(x, z)
+    Y_yz, Z_yz = np.meshgrid(y, z)
+
+    kw = dict(levels=levels, cmap=cmap, alpha=0.9)
+    ax.contour(X_xy, Y_xy, xy_proj,   zdir="z", offset=zlim[0], **kw)
+    ax.contour(X_xz, xz_proj, Z_xz,   zdir="y", offset=ylim[1], **kw)
+    ax.contour(yz_proj, Y_yz, Z_yz,   zdir="x", offset=xlim[0], **kw)
+
+
+def kde_score_to_alpha(score01, alpha_at_0=0.08, alpha_at_05=0.5, alpha_at_1=0.8):
+    """Map normalised KDE scores (0–1) to point opacity."""
+    score01 = np.clip(score01, 0, 1)
+    return np.interp(score01, [0.0, 0.5, 1.0], [alpha_at_0, alpha_at_05, alpha_at_1])
+
+
+def clean_3d_axis(ax):
+    """Strip axes, ticks, gridlines, panes, and box edges from a 3-D axis."""
+    ax.set_xlabel(""); ax.set_ylabel(""); ax.set_zlabel("")
+    ax.set_xticks([]); ax.set_yticks([]); ax.set_zticks([])
+    ax.grid(False)
+    ax.xaxis.pane.set_visible(False)
+    ax.yaxis.pane.set_visible(False)
+    ax.zaxis.pane.set_visible(False)
+    ax.xaxis.line.set_color((1, 1, 1, 0))
+    ax.yaxis.line.set_color((1, 1, 1, 0))
+    ax.zaxis.line.set_color((1, 1, 1, 0))
+    ax.tick_params(axis="both", which="both", length=0, pad=0)
+    ax.set_axis_off()
+
+
+# -----------------------------------------------------------------------
+# BUILD SHARED REFERENCE CLOUD
+# -----------------------------------------------------------------------
+
+print("Building shared reference cloud …")
+shared_reference_points = collect_shared_reference_activity_points(
+    members_df=members,
+    vol_shape=vol_shape,
+    total_points=REFERENCE_N_TOTAL,
+    q_low=REFERENCE_Q_LOW,
+    q_high=REFERENCE_Q_HIGH,
+    min_intensity=REFERENCE_MIN_INTENSITY,
+    max_points_per_file=REFERENCE_MAX_PER_FILE,
+    seed=RANDOM_SEED,
+)
+print(f"Shared reference cloud: {len(shared_reference_points)} cells")
+
+# -----------------------------------------------------------------------
+# COMPUTE SHARED KDE COLOR SCALE (across all patterns)
+# -----------------------------------------------------------------------
+
+all_reference_scores = []
+for cid in cluster_ids:
+    scored_ref = add_pattern_kde_score_to_reference(
+        shared_reference_points, pattern_kdes[cid], score_col="pattern_kde_score"
+    )
+    positive = scored_ref.loc[scored_ref["pattern_kde_score"] > 0, "pattern_kde_score"]
+    if len(positive) > 0:
+        all_reference_scores.append(positive.to_numpy())
+
+if all_reference_scores:
+    all_reference_scores = np.concatenate(all_reference_scores)
+    PATTERN_KDE_VMIN = 0
+    PATTERN_KDE_VMAX = float(np.quantile(all_reference_scores, 0.995))
+else:
+    PATTERN_KDE_VMIN, PATTERN_KDE_VMAX = 0, 1
+
+print(f"KDE color scale: {PATTERN_KDE_VMIN:.4g} → {PATTERN_KDE_VMAX:.4g}")
+
+# -----------------------------------------------------------------------
+# MAIN LOOP — one clean scatter plot per cluster
+# -----------------------------------------------------------------------
+
+scatter_summary_rows = []
+
+for cid in cluster_ids:
+    print(f"\n[SCATTER] Pattern {cid}")
+
+    cluster_df = members[members["cluster"] == cid].copy()
+    vol = pattern_kdes[cid]
+
+    # Score the reference cloud with this pattern's KDE
+    scored_reference_points = add_pattern_kde_score_to_reference(
+        reference_points=shared_reference_points,
+        pattern_kde=vol,
+        score_col="pattern_kde_score",
+    )
+
+    if len(scored_reference_points) == 0:
+        print(f"  No reference points for pattern {cid}; skipping.")
+        continue
+
+    xlim, ylim, zlim = infer_axis_limits(
+        scored_reference_points[["x", "y", "z"]], vol_shape, pad=12
+    )
+
+    # Build RGBA colors: colormap + alpha both driven by KDE score
+    scores = scored_reference_points["pattern_kde_score"].to_numpy()
+    norm   = Normalize(vmin=PATTERN_KDE_VMIN, vmax=PATTERN_KDE_VMAX, clip=True)
+    score01 = norm(scores)
+    rgba = plt.get_cmap(PATTERN_CMAP)(score01)
+    rgba[:, 3] = kde_score_to_alpha(
+        score01,
+        alpha_at_0=alpha_at_0_Var,
+        alpha_at_05=alpha_at_05_Var,
+        alpha_at_1=alpha_at_1_Var,
+    )
+
+    # Create transparent figure
+    fig = plt.figure(figsize=(9, 9))
+    fig.patch.set_alpha(0)
+    ax = fig.add_subplot(111, projection="3d")
+    ax.set_facecolor((1, 1, 1, 0))
+
+    ax.scatter(
+        scored_reference_points["x"],
+        scored_reference_points["y"],
+        scored_reference_points["z"],
+        c=rgba,
+        s=REFERENCE_SIZE,
+        linewidths=0,
+        depthshade=False,
+    )
+
+    add_projection_contours(ax, vol, xlim=xlim, ylim=ylim, zlim=zlim, levels=7, cmap="inferno")
+
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    ax.set_zlim(zlim)
+    ax.view_init(elev=VIEW_ELEV, azim=VIEW_AZIM)
+    clean_3d_axis(ax)
+
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
+
+    # Save
+    out_base = f"pattern_{int(cid):02d}_reference_cloud_kde_colored_alpha_scaled_clean"
+    out_png  = os.path.join(SCATTER_OUTPUT_DIR, f"{out_base}.png")
+    out_pdf  = os.path.join(SCATTER_OUTPUT_DIR, f"{out_base}.pdf")
+    out_svg  = os.path.join(SCATTER_OUTPUT_DIR, f"{out_base}.svg")
+
+    save_kw = dict(bbox_inches="tight", pad_inches=0, transparent=True)
+    fig.savefig(out_png, dpi=300, **save_kw)
+    fig.savefig(out_pdf, **save_kw)
+    fig.savefig(out_svg, **save_kw)
+    plt.show()
+    print(f"  Saved: {out_png}")
+
+    summary_row = pattern_summary[pattern_summary["cluster"] == cid].iloc[0]
+    n_positive  = int((scored_reference_points["pattern_kde_score"] > 0).sum())
+
+    scatter_summary_rows.append({
+        "cluster":                          cid,
+        "n_trials":                         len(cluster_df),
+        "n_odor_conditions":                int(summary_row.n_odor_conditions),
+        "n_reference_points":               len(scored_reference_points),
+        "n_reference_points_nonzero_kde":   n_positive,
+        "reference_q_low":                  REFERENCE_Q_LOW,
+        "reference_q_high":                 REFERENCE_Q_HIGH,
+        "pattern_kde_vmin":                 PATTERN_KDE_VMIN,
+        "pattern_kde_vmax":                 PATTERN_KDE_VMAX,
+        "alpha_at_0":                       alpha_at_0_Var,
+        "alpha_at_05":                      alpha_at_05_Var,
+        "alpha_at_1":                       alpha_at_1_Var,
+        "view_elev":                        VIEW_ELEV,
+        "view_azim":                        VIEW_AZIM,
+        "png_path":                         out_png,
+        "pdf_path":                         out_pdf,
+        "svg_path":                         out_svg,
+    })
+
+# Save summary CSV
+pattern_scatter_summary = pd.DataFrame(scatter_summary_rows)
+pattern_scatter_summary.to_csv(
+    os.path.join(SCATTER_OUTPUT_DIR, "reference_cloud_kde_colored_alpha_scaled_clean_summary.csv"),
+    index=False,
+)
+display(pattern_scatter_summary)
