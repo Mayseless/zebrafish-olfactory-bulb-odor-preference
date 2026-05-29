@@ -1,77 +1,65 @@
-# Mayseless et al 2026
+# Zebrafish olfactory bulb odor preference
 
-This repository contains the analysis scripts and workflows for the study:
+This repository contains analysis scripts and workflows associated with the manuscript:
 
-Mayseless et al. (2026)
-**"Spatial transcriptional modules in the zebrafish olfactory bulb reflect odor preference"**
+**"Odor preference maps to cohesive transcriptional domains in the olfactory bulb"**
 
+## Project overview
 
-
-
-
-## Project Overview
-
-This project establishes a multimodal atlas of the larval zebrafish olfactory bulb (OB), integrating behavioral, functional, and molecular datasets to understand how sensory inputs are transformed into behaviorally relevant outputs.
+This project integrates behavioral, functional, single-cell, and spatial transcriptomic datasets to examine how odorant-evoked activity in the larval zebrafish olfactory bulb relates to odor preference and transcriptionally defined neuronal domains.
 
 The study combines:
 
-* Single-cell RNA sequencing (scRNA-seq)
+- **Single-cell RNA sequencing (scRNA-seq)**  
+  Defines transcriptional diversity and neuronal subtypes.
 
-Resolves transcriptional diversity and defines neuronal subtypes.
+- **Whole-mount spatial transcriptomics**  
+  Maps gene expression in 3D and localizes transcriptional subtypes within the olfactory bulb.
 
+- **Population-scale activity mapping (CaMPARI2)**  
+  Captures odorant-evoked activity patterns in freely behaving larvae.
 
+- **Behavioral assays**  
+  Quantifies odorant-driven preference and navigation strategies using a two-choice flow paradigm.
 
-* Whole-mount spatial transcriptomics
+- **CaMPARI2-seq and HCR validation**  
+  Links odorant-activated neurons to transcriptional identity and spatial localization.
 
-Maps gene expression in 3D to localize transcriptional subtypes within the OB.
+## Repository structure
 
+Scripts are organized by experimental modality:
 
+- `1_Single_cell/`  
+  Seurat-based clustering, neuronal subtype classification, and marker analysis.
 
-* Population-scale activity mapping (CaMPARI)
+- `2_Spatial_transcriptomics/`  
+  Spatial transcriptomic processing, cellular assignment, Tangram-based integration with single-cell data, and spatial organization analyses.
 
-Captures odor-evoked activity patterns across the entire brain.
+- `3_Behavior/`  
+  Analysis of flow-based two-choice behavioral assays and odorant preference.
 
+- `4_CaMPARI/`  
+  Processing and analysis of CaMPARI2-based odorant-evoked activity maps.
 
-
-* Behavioral assays (two-choice flow paradigm)
-
-Quantifies odor-driven preference and navigation strategies.
-
-
-
-* CaMPARI-seq and HCR validation
-
-Links activity-defined neurons to transcriptional identity and spatial localization.
-
-
-
-
-
-## Repository Structure
-
-The scripts are organized by the experimental modality described in the paper:
-
-* `1_Single_cell/`: Seurat-based clustering and cell-type classification.
-* `2_Spatial_transcriptomics/`: Spot detection and cellular assignment, integration with singe cell data (Tangram) and spatial analysis.
-* `3_Behavior/`: Analysis of flow-based two-choice navigation.
-* `4_CaMPARI/`: Processing of odor-evoked activity maps.
-* `5_CaMPARI_Seq_&_HCR_Quantification/`: Integration of activity and molecular identity.
-
-
-
-
+- `5_CaMPARI_Seq_&_HCR_Quantification/`  
+  Analysis of CaMPARI2-seq, HCR validation, and links between activity, molecular identity, and spatial localization.
 
 ## Notes
 
-This repository accompanies a research manuscript and is intended for transparency and reproducibility, not as a fully packaged software tool.
+This repository accompanies a research manuscript and is intended to support transparency and reproducibility. It is not a fully packaged software tool.
 
-Code may require adaptation depending on local environment and data structure.
+Scripts may require adaptation depending on the local computing environment, file paths, and data organization.
 
+## Data availability
 
+This repository contains analysis scripts and workflows associated with the manuscript. Large raw imaging, sequencing, and behavioral datasets are not stored directly in this GitHub repository because of file-size constraints.
+
+Processed data required to reproduce the main analyses will be deposited in a public data repository and linked here upon publication. Until then, data access for review can be provided through Zenodo DOI: 10.5281/zenodo.19607911
 
 ## Citation
 
-If you use these scripts or the data provided, please cite:
+If you use these scripts or associated data, please cite the manuscript once available:
 
-> Mayseless, O., Navajas Acedo, J., Wan, Y., Hahaut, V., Picelli, S., Friedrich, R.W., \& Schier, A.F. (2026).Spatial transcriptional modules in the zebrafish olfactory bulb reflect odor preference.
+> Mayseless, O., Navajas Acedo, J., Wan, Y., Hahaut, V., Picelli, S., Friedrich, R.W., & Schier, A.F. Odor preference maps to cohesive transcriptional domains in the olfactory bulb.
 
+A permanent citation and DOI will be added upon publication.
