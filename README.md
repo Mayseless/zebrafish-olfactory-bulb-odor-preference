@@ -48,7 +48,7 @@ Scripts are organized by experimental modality:
 
 This repository contains analysis scripts and workflows associated with the manuscript. Large raw imaging, sequencing, and behavioral datasets are not stored directly in this GitHub repository because of file-size constraints.
 
-Processed data required to reproduce the main analyses will be deposited in a public data repository and linked here upon publication. Until then, data access for review can be provided through the journal review system or upon reasonable request, where applicable.
+Processed data required to reproduce the main analyses will be deposited in a public data repository and linked here upon publication. 
 
 ## Repository status
 
